@@ -1,11 +1,14 @@
 #!/bin/bash
 
+export LC_ALL=en_US.UTF-8
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
 TIVO_CTRL="tivo 31339"
 
 getkey() {
   (
-    trap 'stty echo -iuclc icanon 2>/dev/null' EXIT INT TERM QUIT HUP
-    stty -echo iuclc -icanon 2>/dev/null
+    trap 'stty echo icanon 2>/dev/null' EXIT INT TERM QUIT HUP
+    stty -echo -icanon 2>/dev/null
     if [ $# -eq 0 ]; then
       dd count=1 bs=1 2>/dev/null
     else
@@ -136,6 +139,35 @@ tivo() {
   return $rc
 }
 
+keyboard() {
+  local c="$1"
+  local o="$(ord "${c}")"
+  if [ "${o}" -ge 65 -a "${o}" -le 90 ]; then
+    tivo "KEYBOARD LSHIFT"
+    c="${c,,}"
+    o=$((o+32))
+  fi
+  case "${c}" in
+    -)   tivo "KEYBOARD MINUS";;
+    =)   tivo "KEYBOARD EQUALS";;
+    [)   tivo "KEYBOARD LBRACKET";;
+    ])   tivo "KEYBOARD RBRACKET";;
+    \\)  tivo "KEYBOARD BACKSLASH";;
+    \;)  tivo "KEYBOARD SEMICOLON";;
+    \')  tivo "KEYBOARD QUOTE";;
+    ,)   tivo "KEYBOARD COMMA";;
+    .)   tivo "KEYBOARD PERIOD";;
+    /)   tivo "KEYBOARD SLASH";;
+    \`)  tivo "KEYBOARD BACKQUOTE";;
+    ' ') tivo "KEYBOARD SPACE";;
+    *)   if [ "${o}" -ge 48 -a "${o}" -le 57 ]; then
+           tivo "IRCODE NUM${c}"
+         elif [ "${o}" -ge 97 -a "${o}" -le 122 ]; then
+           tivo "KEYBOARD ${c^^}"
+         fi;;
+  esac
+}
+
 cat <<EOF
 TIVO Remote Control
 -------------------
@@ -153,15 +185,21 @@ R:      Record
 +:      Thumbs Up
 -:      Thumbs Down
 P:      Play
-U:      Pause
+S:      Pause
+Z:      Zoom
 F:      Forward
 R:      Reverse
-S:      Slow
+W:      Slow
 A:      Advance
 B:      Back
 C:      Clear
 ENTER:  Enter/Last
 0-9:    Number keys
+F1:     Yellow (A)
+F2:     Blue (B)
+F3:     Red (C)
+F4:     Green (D)
+":      Enter Text
 
 EOF
 
@@ -177,20 +215,20 @@ while :; do
         c="${c}$(printf '%s' "${d}" | xxd -ps)"
         d="$(ord "${d}")"
         [ ${d} -lt 48 -o ${d} -gt 59 -o "${d}" -eq 58 ] &&
-          [ "${d}" -ne 91 ] &&
+          [ "${d}" -ne 91 -a "${d}" -ne 79 ] &&
           break
       done
     fi
   fi
   tput cr; tput el
   case "${c}" in
-    T|1b5b68)            tivo "IRCODE TIVO";;
+    T|1b5b48)            tivo "IRCODE TIVO";;
     N)                   tivo "IRCODE NOWSHOWING";;
     V)                   tivo "IRCODE LIVETV";;
-    K|10|1b5b61)         tivo "IRCODE UP";;
-    J|0e|1b5b62)         tivo "IRCODE DOWN";;
-    L|06|1b5b63)         tivo "IRCODE RIGHT";;
-    H|02|1b5b64)         tivo "IRCODE LEFT";;
+    K|10|1b5b41)         tivo "IRCODE UP";;
+    J|0e|1b5b42)         tivo "IRCODE DOWN";;
+    L|06|1b5b43)         tivo "IRCODE RIGHT";;
+    H|02|1b5b44)         tivo "IRCODE LEFT";;
     20)                  tivo "IRCODE SELECT";;
     I)                   tivo "IRCODE INFO";;
     G)                   tivo "IRCODE GUIDE";;
@@ -200,14 +238,27 @@ while :; do
     +)                   tivo "IRCODE THUMBSUP";;
     -)                   tivo "IRCODE THUMBSDOWN";;
     P)                   tivo "IRCODE PLAY";;
-    U)                   tivo "IRCODE PAUSE";;
+    S)                   tivo "IRCODE PAUSE";;
+    Z)                   tivo "IRCODE WINDOW";;
     F)                   tivo "IRCODE FORWARD";;
     R)                   tivo "IRCODE REVERSE";;
-    S)                   tivo "IRCODE SLOW";;
-    A|1b5b66|09)         tivo "IRCODE ADVANCE";;
+    W)                   tivo "IRCODE SLOW";;
+    A|1b5b46|09)         tivo "IRCODE ADVANCE";;
     B|1b)                tivo "IRCODE REPLAY";;
     C|1b5b337e)          tivo "IRCODE CLEAR";;
     0a)                  tivo "IRCODE ENTER";;
     0|1|2|3|4|5|6|7|8|9) tivo "IRCODE NUM${c}";;
+    1b4f50)              tivo "IRCODE ACTION_A";;
+    1b4f51)              tivo "IRCODE ACTION_B";;
+    1b4f52)              tivo "IRCODE ACTION_C";;
+    1b4f53)              tivo "IRCODE ACTION_D";;
+    '"')                 read -r -p "Enter text: " txt
+                         tput cuu 1
+                         tput el
+                         sed -e 's/./&\n/g' <<<"${txt}" |
+                           while IFS= read -r c; do
+                             keyboard "${c}"
+                         done
+                         ;;
   esac
 done
