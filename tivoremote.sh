@@ -3,7 +3,7 @@
 export LC_ALL=en_US.UTF-8
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-TIVO_CTRL="tivo 31339"
+TIVO_CTRL="${1:-tivo} 31339"
 
 getkey() {
   (
